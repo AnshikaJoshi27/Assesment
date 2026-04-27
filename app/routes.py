@@ -9,12 +9,12 @@ All functions handle specific HTTP endpoints and return JSON responses.
 
 from flask import request, jsonify
 from app.db import db
-from app.models import Employee, EmployeeSchema
-from marshmallow import ValidationError
+from app.models import Employee, EmployeeCreate, EmployeeResponse
+from pydantic import ValidationError
 
-# Create schema instances for serialization/validation
-employee_schema = EmployeeSchema()
-employees_schema = EmployeeSchema(many=True)
+# Create Pydantic schema instances for validation/serialization
+employee_create_schema = EmployeeCreate
+employee_response_schema = EmployeeResponse
 
 
 # ===== ROUTE REGISTRATION =====
@@ -34,13 +34,13 @@ def setup_routes(app):
     def create_employee():
         """Create a new employee - POST /employees"""
         try:
-            employee_data = employee_schema.load(request.json)
-            employee = Employee(**employee_data)
+            employee_data = employee_create_schema(**request.json)
+            employee = Employee(**employee_data.dict())
             db.session.add(employee)
             db.session.commit()
-            return jsonify(employee_schema.dump(employee)), 201
+            return jsonify(employee_response_schema.from_orm(employee).dict()), 201
         except ValidationError as err:
-            return jsonify({'error': 'Validation failed', 'details': err.messages}), 400
+            return jsonify({'error': 'Validation failed', 'details': err.errors()}), 400
         except Exception as err:
             db.session.rollback()
             return jsonify({'error': 'Server error', 'message': str(err)}), 500
@@ -50,7 +50,7 @@ def setup_routes(app):
         """Get all employees - GET /employees"""
         try:
             employees = Employee.query.all()
-            return jsonify(employees_schema.dump(employees))
+            return jsonify([employee_response_schema.from_orm(emp).dict() for emp in employees])
         except Exception as err:
             return jsonify({'error': 'Server error', 'message': str(err)}), 500
 
@@ -59,7 +59,7 @@ def setup_routes(app):
         """Get employee by ID - GET /employees/<id>"""
         try:
             employee = Employee.query.get_or_404(employee_id)
-            return jsonify(employee_schema.dump(employee))
+            return jsonify(employee_response_schema.from_orm(employee).dict())
         except Exception as err:
             return jsonify({'error': 'Server error', 'message': str(err)}), 500
 
@@ -68,15 +68,15 @@ def setup_routes(app):
         """Update employee - PUT /employees/<id>"""
         try:
             employee = Employee.query.get_or_404(employee_id)
-            employee_data = employee_schema.load(request.json)
+            employee_data = employee_create_schema(**request.json)
             
-            for key, value in employee_data.items():
+            for key, value in employee_data.dict().items():
                 setattr(employee, key, value)
             
             db.session.commit()
-            return jsonify(employee_schema.dump(employee))
+            return jsonify(employee_response_schema.from_orm(employee).dict())
         except ValidationError as err:
-            return jsonify({'error': 'Validation failed', 'details': err.messages}), 400
+            return jsonify({'error': 'Validation failed', 'details': err.errors()}), 400
         except Exception as err:
             db.session.rollback()
             return jsonify({'error': 'Server error', 'message': str(err)}), 500

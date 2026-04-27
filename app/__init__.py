@@ -12,7 +12,7 @@ from app.db import init_db
 import logging
 from werkzeug.exceptions import HTTPException
 from sqlalchemy.exc import SQLAlchemyError
-from marshmallow import ValidationError
+from pydantic import ValidationError
 
 
 def create_app(config_class=Config):
@@ -128,11 +128,11 @@ def register_error_handlers(app):
     
     @app.errorhandler(ValidationError)
     def validation_error(error):
-        """Handle Marshmallow validation errors"""
+        """Handle Pydantic validation errors"""
         return jsonify({
             'error': 'Validation Error', 
             'message': 'Input data validation failed',
-            'details': error.messages,
+            'details': error.errors(),
             'status_code': 400
         }), 400
     

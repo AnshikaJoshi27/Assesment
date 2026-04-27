@@ -3,14 +3,15 @@ Data Models and Schemas
 
 This module defines:
 1. Employee model - SQLAlchemy database model with business logic
-2. EmployeeSchema - Marshmallow schema for validation and serialization
+2. EmployeeCreate/EmployeeResponse - Pydantic schemas for validation and serialization
 
 The Employee model contains the core business logic for salary calculations
 with country-specific tax deduction rules.
 """
 
 from app.db import db
-from marshmallow import Schema, fields, validate
+from pydantic import BaseModel, Field, validator
+from typing import Optional
 
 
 class Employee(db.Model):
@@ -91,25 +92,44 @@ class Employee(db.Model):
         }
 
 
-class EmployeeSchema(Schema):
+class EmployeeCreate(BaseModel):
     """
-    Marshmallow schema for Employee model validation and serialization.
+    Pydantic schema for creating/updating employees.
     
-    This schema handles:
-    1. Input validation when creating/updating employees
-    2. Data serialization when sending responses to API clients
-    3. Type conversion (e.g., string to float for salary)
+    This schema handles input validation when creating or updating employees.
     
     Validation Rules:
-    - All fields except 'id' are required
+    - All fields are required
     - Strings must be non-empty and within length limits
     - Salary must be a positive number
-    - ID is auto-generated and only included in output
     """
     
-    # Field definitions with validation rules
-    id = fields.Int(dump_only=True)                                           # Output only, auto-generated
-    full_name = fields.Str(required=True, validate=validate.Length(min=1, max=100))  # Required, 1-100 chars
-    job_title = fields.Str(required=True, validate=validate.Length(min=1, max=100))  # Required, 1-100 chars
-    country = fields.Str(required=True, validate=validate.Length(min=1, max=50))     # Required, 1-50 chars
-    salary = fields.Float(required=True, validate=validate.Range(min=0))             # Required, positive number
+    full_name: str = Field(..., min_length=1, max_length=100, description="Employee's full name")
+    job_title: str = Field(..., min_length=1, max_length=100, description="Employee's job title")
+    country: str = Field(..., min_length=1, max_length=50, description="Employee's country")
+    salary: float = Field(..., gt=0, description="Employee's gross salary (must be positive)")
+    
+    @validator('full_name', 'job_title', 'country')
+    def validate_strings_not_empty(cls, v):
+        """Ensure string fields are not empty or just whitespace"""
+        if not v or not v.strip():
+            raise ValueError('Field cannot be empty or contain only whitespace')
+        return v.strip()
+
+
+class EmployeeResponse(BaseModel):
+    """
+    Pydantic schema for employee API responses.
+    
+    This schema handles data serialization when sending responses to API clients.
+    Includes all employee fields including the auto-generated ID.
+    """
+    
+    id: int = Field(..., description="Employee ID (auto-generated)")
+    full_name: str = Field(..., description="Employee's full name")
+    job_title: str = Field(..., description="Employee's job title")
+    country: str = Field(..., description="Employee's country")
+    salary: float = Field(..., description="Employee's gross salary")
+    
+    class Config:
+        from_attributes = True  # Allows creation from SQLAlchemy models
