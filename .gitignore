@@ -66,6 +66,15 @@ db.sqlite3-journal
 salary_management.db
 *.db
 
+instance/*.db
+instance/*.cfg
+instance/*.py
+instance/config.py
+instance/*.env
+instance/*.key
+instance/*.pem
+instance/*.log
+
 # Scrapy stuff:
 .scrapy
 
